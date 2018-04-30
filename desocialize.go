@@ -15,7 +15,7 @@ type Desocalizer struct {
 	Effect string
 }
 
-func (d Desocalizer) Desocialize(filename string) {
+func (d Desocalizer) Desocialize(filename string, output_filename string) {
 	_, currentfile, _, _ := runtime.Caller(0)
 	img := opencv.LoadImage(path.Join(path.Dir(currentfile), filename))
 
@@ -36,11 +36,13 @@ func (d Desocalizer) Desocialize(filename string) {
 			f.Y()+f.Height(),
 		)
 		gl.SetBounds(r)
-		gl.HalfLifeRight(100, 100)
-		gl.HalfLifeLeft(100, 100)
+		//gl.VerticalTransposeInput(f.Width(), f.Height(), true)
+		//gl.TransposeInput(f.Width(), f.Height(), true)
+		gl.PrismBurst()
+		gl.HalfLifeRight(f.Height()*4, f.Width()/2)
 	}
 
-	f, err := os.Create("desocialize_" + filename)
+	f, err := os.Create(output_filename)
 	check(err)
 	gl.Write(f)
 }

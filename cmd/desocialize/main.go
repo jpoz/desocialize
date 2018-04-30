@@ -25,12 +25,13 @@ func main() {
 	flag.Parse()
 
 	in := flag.Arg(0)
+	out := flag.Arg(1)
 
 	dsclze := &desocialize.Desocalizer{
 		Effect: effect,
 	}
 
-	dsclze.Desocialize(in)
+	dsclze.Desocialize(in, out)
 }
 
 func fail(s string, e error) {
