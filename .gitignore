@@ -4,6 +4,8 @@
 *.so
 *.dylib
 
+desocialize_*.jpg
+
 # Test binary, build with `go test -c`
 *.test
 
