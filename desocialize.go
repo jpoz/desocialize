@@ -1,13 +1,15 @@
 package desocialize
 
 import (
+	"fmt"
 	"image"
+	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
 
+	pigo "github.com/esimov/pigo/core"
 	"github.com/jpoz/glitch"
-	"github.com/lazywei/go-opencv/opencv"
 )
 
 // Desocalizer will corrupt faces in images
@@ -17,12 +19,34 @@ type Desocalizer struct {
 
 func (d Desocalizer) Desocialize(filename string, output_filename string) {
 	_, currentfile, _, _ := runtime.Caller(0)
-	img := opencv.LoadImage(path.Join(path.Dir(currentfile), filename))
+	cascadeFilePath := path.Join(path.Dir(currentfile), "facefinder")
 
-	cascade := opencv.LoadHaarClassifierCascade(
-		path.Join(path.Dir(currentfile), "haarcascade_frontalface_alt.xml"),
-	)
-	faces := cascade.DetectObjects(img)
+	cascadeFile, err := ioutil.ReadFile(cascadeFilePath)
+	check(err)
+
+	src, err := pigo.GetImage(filename)
+	check(err)
+
+	sampleImg := pigo.RgbToGrayscale(src)
+
+	cParams := pigo.CascadeParams{
+		MinSize:     20,
+		MaxSize:     1000,
+		ShiftFactor: 0.1,
+		ScaleFactor: 1.1,
+	}
+	cols, rows := src.Bounds().Max.X, src.Bounds().Max.Y
+	imgParams := pigo.ImageParams{sampleImg, rows, cols, cols}
+
+	pigo := pigo.NewPigo()
+
+	classifier, err := pigo.Unpack(cascadeFile)
+	check(err)
+
+	faces := classifier.RunCascade(imgParams, cParams)
+	faces = classifier.ClusterDetections(faces, 0.2)
+
+	fmt.Println(faces)
 
 	gl, err := glitch.NewGlitch(filename)
 	check(err)
@@ -30,20 +54,29 @@ func (d Desocalizer) Desocialize(filename string, output_filename string) {
 	gl.Copy()
 
 	for _, f := range faces {
-		r := image.Rect(
-			f.X(), f.Y(),
-			f.X()+f.Width(),
-			f.Y()+f.Height(),
-		)
-		gl.SetBounds(r)
-		//gl.VerticalTransposeInput(f.Width(), f.Height(), true)
-		//gl.TransposeInput(f.Width(), f.Height(), true)
-		gl.PrismBurst()
-		gl.HalfLifeRight(f.Height()*4, f.Width()/2)
+		var qThresh float32 = 3.0
+
+		if f.Q > qThresh {
+			x := f.Col-f.Scale/2
+			y := f.Row-f.Scale/2
+
+			r := image.Rect(
+				x, y,
+				x + f.Scale,
+				y + f.Scale,
+			)
+
+			gl.SetBounds(r)
+			//gl.VerticalTransposeInput(f.Width(), f.Height(), true)
+			//gl.TransposeInput(f.Width(), f.Height(), true)
+			gl.HalfLifeRight(f.Scale, f.Scale)
+			gl.PrismBurst()
+		}
 	}
 
 	f, err := os.Create(output_filename)
 	check(err)
+
 	gl.Write(f)
 }
 
